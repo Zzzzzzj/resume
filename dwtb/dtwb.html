@@ -1,0 +1,209 @@
+﻿<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>don't touch the white block</title>
+<style type="text/css">
+	button{
+		float:left;
+		}
+#main{
+	width:200px;
+	height:200px;
+border-bottom:1px solid black;
+overflow:hidden;
+}
+
+#con{
+width:100%;
+height:100%;
+margin:0px 0px 0px 0px;
+position:relative;
+top:-50px;
+}
+
+.col{
+    float:left;
+    width:50px;
+    margin:0px 0px 0px 0px;
+    height:50px;
+}
+.black{
+    background:black;
+}
+.first{
+    width:100%;
+    margin:0px 0px 0px 0px;
+    height:50px;
+}
+
+.row{
+ height:50px;
+ width:100%;
+}
+
+h2{
+    margin:0px;
+    width:198px;
+    text-align:center;
+    height:50px;
+    border:1px solid black;
+    background:000000;
+}
+
+body{
+   margin:0px;
+}
+</style>
+<script type="text/javascript">
+
+var speed = 2;
+var row = 4;
+var col = 4;
+var game_stat= 0;
+
+function f(id){
+	return document.getElementById(id);
+}
+
+function cE(ele,cls){
+	var E = document.createElement(ele);
+	E.setAttribute("class",cls);
+	return E;
+}
+
+function add(ele,cls){
+	var con = f(ele);
+	var E = cE("div",cls);
+	if(cls=="row first"){
+	con.appendChild(E);
+	}else{
+	con.insertBefore(E,con.firstChild);
+	}
+}
+
+function delrow(){
+	var con = f('con');
+	if(con.childNodes.length == 6) {
+				 con.removeChild(con.lastChild);
+		 }
+}
+
+function speedup(){
+		speed += 1;
+		if(speed == 20){
+				alert('你超神了');
+		}
+}
+
+function move(){
+		var con = f('con');
+		var top = parseInt(window.getComputedStyle(con, null)['top']);
+		var bottom = parseInt(window.getComputedStyle(con, null)['bottom']);
+		if(speed + top > 0){
+				top = 0;
+		}else{
+				top += speed;
+		}
+		con.style.top = top + 'px';
+		
+
+		if(top == 0){
+			add("con","row");
+	    var r = parseInt(Math.random()*4);
+			for(var j =0;j<col;j++){
+		  var c = document.getElementsByClassName("row");
+		  if(j!=r)
+		  var Ec =cE("div","col");
+		  else
+		  var Ec = cE("div","col black");
+		  c[0].appendChild(Ec);
+		}
+		con.style.top = '-50px';
+		delrow();
+	  }
+ 			if(top == (-50 + speed)){
+			var rows = con.childNodes;
+			if((rows.length == 5) && (rows[rows.length-1].pass != 1) ){
+				fail();
+			}
+		}
+}
+
+function score(){
+		var newscore = parseInt(f('score').innerHTML) + 1;
+		f('score').innerHTML = newscore;
+		if(newscore % parseInt(Math.random()*10) == 0){
+				speedup();
+		}
+}
+
+       // 判断是否点击黑块
+function judge(ev){
+            if(ev.target.className.indexOf('black') == -1){
+                // ev.target.className = 'cell red';
+                // fail();
+                pass;
+            }else{
+                ev.target.className = 'row';
+                ev.target.parentNode.pass = 1; //定义属性pass，表明此行row的黑块已经被点击
+                score();
+            }
+           }
+
+function fail(){
+								clearInterval(clock);
+								confirm('你的最终得分为 ' + parseInt(f('score').innerHTML) );
+								game_stat=1;
+						}
+
+function init(){
+
+	var con = f('con');
+	var l = con.childNodes;
+	if(game_stat==1||l.length!=0){
+		for(var i=l.length-1;i>=0;i--){
+			con.removeChild(l[i]);
+			}
+				f('score').innerHTML="0";
+	speed=2;
+	game_stat=0;
+		}
+		
+	for(var i =0;i<row;i++){
+	  if(i==0)add("con","row first");
+	else
+	  add("con","row");
+	  var r = parseInt(Math.random()*4);
+	  for(var j =0;j<col;j++){
+	  var c = document.getElementsByClassName("row");
+	  if(j!=r)
+	  var Ec =cE("div","col");
+	  else
+	  var Ec = cE("div","col black");
+	  c[0].appendChild(Ec);
+	}
+	}
+		
+	f("main").onclick=function(ev){
+	judge(ev);
+	}
+	// 定时器 每30毫秒调用一次move()
+			clock = window.setInterval('move()', 30);
+}
+
+
+</script>
+</head>
+<body>
+<h2>Sroce</h2>
+<div id="main">
+   <div id="con">
+   </div>
+</div>
+   <hr/>
+   <div id="bom">
+   <button onclick="init()">begin</button><h3 id="score">0</h3>
+   </div>
+</body>
+</html>

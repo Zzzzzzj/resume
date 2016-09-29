@@ -1,0 +1,698 @@
+﻿<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml">
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+<meta name="keywords" content="车辆实时监控系统" />
+<meta name="description" content="车辆实时监控系统" />
+<title>重点车辆监控系统</title>
+<!--引用百度地图API-->
+<style type="text/css">
+    html,body{margin:0;padding:0;}
+    .iw_poi_title {color:#CC5522;font-size:14px;font-weight:bold;overflow:hidden;padding-right:13px;white-space:nowrap}
+    .iw_poi_content {font:12px arial,sans-serif;overflow:visible;padding-top:4px;white-space:-moz-pre-wrap;word-wrap:break-word}
+</style>
+<link	rel="stylesheet" type="text/css" href="css/style.css"/>
+<script type="text/javascript" src="http://apps.bdimg.com/libs/jquery/2.1.4/jquery.min.js"></script>
+<script type="text/javascript" src="https://api.map.baidu.com/api?v=2.0&ak=mQlZqYmlAKud9sw63TEvZA7ISt1IrYmy"></script>
+<script type="text/javascript" src="http://api.map.baidu.com/library/DrawingManager/1.4/src/DrawingManager_min.js"></script>
+<script type="text/javascript" src="http://api.map.baidu.com/library/GeoUtils/1.2/src/GeoUtils_min.js"></script>
+<link rel="stylesheet" href="http://api.map.baidu.com/library/DrawingManager/1.4/src/DrawingManager_min.css" />
+
+</head>
+
+<body>
+  <!--百度地图容器-->
+<div style="width: 100%;" id="content">
+  <div style="width:80%;height:100%;border:#ccc solid 1px;" id="dituContent"></div>
+  <div style="height: 100%;width:19%;" id="content_right">
+  <div id="button_show_hidden">
+  <button type="button" id="show_line" onclick="show_line()">显示路径</button>
+  <button type="button" id="hidden_line" onclick="hidden_line()">隐藏路径</button>
+  </div> 
+ <p>  
+ 	<button type="button" id="show_line" onclick="show_last_point()">显示最新地点</button>
+ </p>
+ <hr />
+ 	<h4>创建电子围栏</h4>
+ 	<div id="button_createf_closeef">
+  	<button type="button" id="create_EF" onclick="create_EF()">创建电子围栏</button>
+  	<button type="button" id="close_EF" onclick="close_EF()">停止创建电子围栏</button>  	
+ 	</div>
+ 	<div id="button_removeef_openef">
+  	<button type="button" id="remove_EF" onclick="remove_EF()">清除电子围栏</button> 		
+   	<button type="button" id="open_EF" onclick="open_EF()">开启电子围栏</button>	
+ 	</div>
+ 	<div>
+ 	<p id="number_of_ef"></p>
+ 	<hr />
+ 	<div id="outof_ef"></div>
+ 	</div>
+ <hr />
+ <div id = "get_speed">
+ 	设置速度(m/s):
+ 	<input type="text" id="overspeed" onkeyup="value=value.replace(/[^\d{1,}\.\d{1,}|\d{1,}]/g,'')" placeholder="输入数字">
+ 	<button type="button" id = "check_overspeed" onclick="check_overspeed()">检测超速</button>
+ 	<div id="overspeed_show"></div>
+ 	<div>超速处总数为：<span id="number_of_overspeed"></span></div>
+ </div>
+ <hr/>
+   <div id="point_of_stop">
+   </div>
+    <div id="point_number">	
+ 	</div>
+  </div>
+</div>  
+</body>
+	
+<script type="text/javascript">
+
+    var arr_time = new Array();
+    var arr_alt = new Array();
+    var arr_l = new Array(); 
+    var points = new Array();
+    var arr_line = new Array();
+
+    var count_data;
+    var count;
+    var arr_lat_lon = new Array();
+    var i_arr_line;
+    var convertor = new BMap.Convertor();
+    var arr_length;   
+    var last_lat;
+    var last_lon;
+    var last_alt;
+    var last_time;
+    var interval_getlast;
+    var overlay = new Array();
+	var lat_lon_change= new Array();
+	var number_of_ef;
+	var marker_of_point = new Array();
+	var point_outof_ef = new Array();
+	var is_reverse;
+	var is_show_line;
+	var is_show_lastpoint;
+	var time_difference = new Array();
+	var arr_distance = new Array();
+
+	Array.prototype.indexOf = function(val) {
+            for (var i = 0; i < this.length; i++) {
+                if (this[i] == val) return i;
+            }
+            return -1;
+        };
+    Array.prototype.remove = function(val) {
+            var index = this.indexOf(val);
+            if (index > -1) {
+                this.splice(index, 1);
+            }
+        };
+    Array.prototype.indexOf = function(el){
+		 for (var i=0,n=this.length; i<n; i++){
+		  if (this[i] === el){
+		   return i;
+		  }
+		 }
+		 return -1;
+		}
+    
+	function get_time(arr_t){
+		time_difference=[];
+		var d1,d2,d3;
+		var d4 = new Date();
+		var year,month,date,hour,minute,second;
+		time_difference[0]=0;
+		for(var i=0;i<arr_t.length-1;i++){
+			d1 = new Date(arr_time[i]);
+			d2 = new Date(arr_time[i+1]);
+			d3 = d2-d1;
+			d4.setTime(d3);					
+			time_difference.push(d4.getTime()/1000);
+		}
+	}
+	
+	function get_distance(arr_point){
+		arr_distance=[];
+		var distance;
+		arr_distance[0]=0;
+		for(var i=0;i<arr_point.length-1;i++){
+			distance = BMapLib.GeoUtils.getDistance(arr_point[i],arr_point[i+1]);
+			arr_distance.push(distance);
+		}
+
+	}
+	
+	function get_speed(time,distance){
+		var arr_speed=new Array();
+		arr_speed[0]=0;
+		var speed;
+
+		for(var i=1;i<time.length;i++){
+			speed = distance[i]/time[i];
+			arr_speed.push(speed);
+		}
+		window.arr_speed = arr_speed;
+	}
+	
+	function check_overspeed(){
+		var Specified_speed=$("#overspeed").val();
+		if(Specified_speed != ""){
+			var n_ss = Number(Specified_speed);
+			var str = "";
+			var numberofoverspeed = 0;
+			for(var i=1;i<arr_speed.length;i++){
+				if(n_ss<Number(arr_speed[i])){				
+				numberofoverspeed+=1;	
+				str += "<b id='warming'>警告";
+				str += numberofoverspeed;
+				str += "</b>：目标在时间为";
+				str += arr_time[i];
+				str += "超速了，";
+				str += "目标编号为:";
+				str += i+1;
+				str += " 速度为：";
+				str += arr_speed[i];
+				str += "<br />";
+				str += "<hr />"
+				}
+			}
+		$("#overspeed_show").html(str);
+		$("#number_of_overspeed").html(numberofoverspeed);
+		}
+		}
+	
+	function check_stop(){
+		var str = "";
+		var numberofstop=0;
+		var d=0;
+		for(var i=0;i<arr_distance.length;i++){
+			d=0;
+			if(arr_distance[i]<=5){
+				while(arr_distance[i+d]<5){
+					if(time_difference[i+d]<60){
+						d++;
+					}
+					else{
+						break;
+					}
+				}
+				if(d>=4){
+				numberofstop+=1;	
+				str += "<b id='prompt'>提示";
+				str += numberofstop;
+				str += "</b>：有目标在时间为";
+				str += arr_time[i-1];
+				str += "至时间";
+				str += arr_time[i+d-1];
+				str += "处有停滞现象，请查明";
+				str += "目标编号为:";
+				str += i;	
+				str += "-";
+				str += i+d;
+				if(i+d == lat_lon_change.length){
+					str += "<br /><b id='warming'>当前正在停滞！请查明！</b>";
+					alert("当前正在停滞！请查明！");
+ 				}
+				str += "<br />";
+				str += "<hr />"
+				i=i+d;
+				}
+			}
+		}
+		$("#point_of_stop").html(str);
+		var str_pn = "共取到轨迹点:";
+		str_pn += lat_lon_change.length;
+		str_pn += "个";
+		$("#point_number").html(str_pn);
+	}
+	
+	
+	function show_line(){
+	if(is_show_line==false){
+	hidden_line()	
+    change_lat_lon(arr_lat_lon);
+//  addMarker_last();      
+//	line.show();
+	marker_of_last.show();
+	is_show_lastpoint=true;
+	if(marker_of_point.length!=0){
+			for(var i = 0;i<marker_of_point.length;i++){
+				marker_of_point[i].show();
+			}
+		}
+	}
+	}
+	
+	function show_last_point(){
+    		hidden_line();
+    		if(is_show_lastpoint==false){
+    	    get_last_data();
+            addMarker_last();	
+            interval_getlast=self.setInterval(function(){
+            	marker_of_last.hide();	
+            	get_last_data();
+            	addMarker_last();
+            },10000);
+            is_show_lastpoint=true;
+    		}
+	}
+	
+	function create_EF(){
+		if(!map_drawingmanager){
+		var map_drawingmanager = new BMapLib.DrawingManager(map, 
+		{
+		isOpen: false,
+    	enableDrawingTool: true,
+    	enableCalculate: true,
+    	drawingToolOptions: {
+        anchor: BMAP_ANCHOR_TOP_RIGHT,
+        offset: new BMap.Size(5, 5),
+        drawingModes:[BMAP_DRAWING_CIRCLE,BMAP_DRAWING_RECTANGLE]
+    	},
+		circleOptions:{
+			strokeOpacity:0.3,
+			fillOpacity:0.3
+		},
+		rectangleOptions:{
+			strokeOpacity:0.3,
+			fillOpacity:0.3
+		}
+		});
+    	
+    	window.map_drawingmanager = map_drawingmanager;
+    	
+    	map_drawingmanager.addEventListener("overlaycomplete", function(e) {
+    	map_drawingmanager.close();
+    	if(e.calculate>100){
+    	number_of_ef+=1;
+    	overlay.push(e);
+    	var overlayMenu =new BMap.ContextMenu();
+    	overlayMenu.addItem(new BMap.MenuItem('删除',function(){map.removeOverlay(e.overlay);
+    															map.removeOverlay(e.label)
+    															number_of_ef-=1;
+    															overlay.remove(e);
+    															$("#number_of_ef").text("已设置电子围栏数量为："+overlay.length);	}));
+    	e.overlay.addContextMenu(overlayMenu);
+    	$("#number_of_ef").text("已设置电子围栏数量为："+overlay.length);
+    	//alert(e.overlay);
+		}else{
+    		map.removeOverlay(e.overlay);
+    		map.removeOverlay(e.label);
+    	}});
+    	
+		}
+	}
+	
+	function close_EF(){
+		map_drawingmanager.close();
+	}
+	
+	
+	function  hidden_line(){
+		//map.clearOverlays();
+		if(is_show_line==true){
+		line.hide();
+		if(marker_of_point.length!=0){
+			for(var i = 0;i<marker_of_point.length;i++){
+				marker_of_point[i].hide();
+			}
+		}
+		marker_of_last.hide();
+		clearInterval(interval_getlast);
+		is_show_line=false;
+		is_show_lastpoint=false;
+		}	
+	}
+
+	function remove_EF(){
+		if(overlay.length>0){
+			for(var i=0;i<overlay.length;i++){
+				overlay[i].overlay.hide();
+				map.removeOverlay(overlay[i].label);
+				number_of_ef-=1;	
+			}
+			overlay.length=0;
+			overlay=[];
+    	$("#number_of_ef").text("已设置电子围栏数量为："+number_of_ef);			
+		}
+	}
+
+	function open_EF(){
+		point_outof_ef=[];
+		if(overlay.length==0){
+			alert("开启电子围栏前请先在地图上创建出围栏的范围");
+		}
+		else{
+			//setInterval(,10000);
+				is_in_shape(overlay[0],lat_lon_change,0,overlay);
+		}
+	}
+
+	function is_in_shape(e,points,index,f){
+		var result;
+		//alert(e.overlay);
+		if(e.overlay=="[object Circle]")
+		{
+			for(i = 0;i<points.length;i++){
+			result = BMapLib.GeoUtils.isPointInCircle(points[i],e.overlay);
+			if(result == false){
+			if(index == 0){
+			point_outof_ef.push(points[i]);
+			//alert("push:"+i);
+			}
+			}
+			else{
+			//alert("s remove:"+i);
+			point_outof_ef.remove(points[i]);
+			//alert("remove:"+i);
+			if(index!=0)i=-1;
+			}
+			}
+		}
+		else if(e.overlay=="[object Polygon]"){
+			//alert("polygon");
+			for(i = 0;i<points.length;i++){
+			//alert("polygon:"+i+"  point:"+points.length);
+			result = BMapLib.GeoUtils.isPointInPolygon(points[i],e.overlay);
+			if(result == false){
+			if(index == 0){
+			point_outof_ef.push(points[i]);
+			//alert("push:"+i);
+			}
+			}
+			else{
+			//alert("s remove:"+i);
+			point_outof_ef.remove(points[i]);
+			//alert("remove:"+i);
+			if(index!=0)i=-1;
+			}
+			}
+		}
+		if(index==0) alert("电子围栏数量为："+f.length);
+		index++;		
+		if(index<f.length){
+			//alert(point_outof_ef[0]);		
+			is_in_shape(overlay[index],point_outof_ef,index,overlay);
+		}
+		else{
+			alert("number of out of ef:"+point_outof_ef.length);
+			var str = "";
+			for(var i =0 ;i<point_outof_ef.length;i++){
+				str += "<b id='warming'>警告</b>：目标在时间为";
+				str += arr_time[lat_lon_change.indexOf(point_outof_ef[i])];
+				str += "处脱离了电子围栏，坐标为:经度：";
+				str += point_outof_ef[i].lat;
+				str += " 纬度：";
+				str += point_outof_ef[i].lng;
+				str += "目标编号为:";
+				str += lat_lon_change.indexOf(point_outof_ef[i])+1;
+				str += "<br />"
+			}
+			$("#outof_ef").html(str);
+		}
+		
+	}
+
+
+    function  get_history_data(){
+        $.getJSON("history.js", function(data){
+            $.each(data, function(i, item) {
+                arr_time[i]=item.time;
+                arr_l[i]=item.lon+"|"+item.lat;
+                arr_alt[i]=item.alt;    
+            });
+            });
+        return arr_l;
+    }
+
+	function  get_last_data(){
+        $.getJSON("last_data.js", function(data){
+            $.each(data, function(i, item) {
+            	switch (i){
+            		case 0:
+            		last_lat=item.value;
+            		last_time = item.lastUpdateTime;
+            			break;
+            		case 1:last_lon=item.value;
+            			break;
+            		case 2:last_alt=item.value;
+            			break;
+            	}
+            });
+            });
+    }
+
+
+    //创建和初始化地图函数：
+    function initMap(){
+    	arr_alt=[];
+    	arr_time=[];
+    	arr_l=[];
+    	number_of_ef=0;
+    	is_reverse=false;
+      	$.ajaxSettings.async = false; 
+        arr_lat_lon=[];
+
+        get_last_data();
+        
+        createMap();//创建地图
+        setMapEvent();//设置地图事件
+        addMapControl();//向地图添加控件  
+        
+        arr_lat_lon = get_history_data();
+        arr_time.reverse();        
+        get_time(arr_time);        
+        //alert();
+        change_lat_lon(arr_lat_lon);
+        get_last_data();
+        addMarker_last();
+        interval_getlast=self.setInterval(function(){
+            	marker_of_last.hide();	
+            	get_last_data();
+            	addMarker_last();
+            	
+				if(is_show_line==true){
+				line.hide();
+				if(marker_of_point.length!=0){
+					for(var i = 0;i<marker_of_point.length;i++){
+						marker_of_point[i].hide();
+					}
+				}
+				is_show_line=false;
+				is_show_lastpoint=false;
+				}
+				arr_alt=[];
+    			arr_time=[];
+    			arr_l=[];
+            	arr_lat_lon = get_history_data();
+       	 		arr_time.reverse();        
+        		get_time(arr_time);  
+        		is_reverse=false;
+        		change_lat_lon(arr_lat_lon);
+            },100000);
+        $("#number_of_ef").text("已设置电子围栏数量为："+overlay.length);    
+        $("#number_of_overspeed").html("0");    
+    }
+    
+    translateCallback = function (data){
+      if(data.status === 0) {
+        if(count_data==0){
+        	for(var i=0;i<data.points.length;i++){
+        		//addMarker(data.points[i],count);
+        	    count++;
+        	    lat_lon_change.push(data.points[i]);
+        	}
+        }
+        else{
+        	for(var i=1;i<data.points.length;i++){
+        	    //addMarker(data.points[i],count);
+        	    count++; 
+        	    lat_lon_change.push(data.points[i]);
+        	}
+        }
+        count_data ++;
+        i_arr_line+=1;
+        if(i_arr_line<arr_line.length){
+         	       	convertor.translate(arr_line[i_arr_line],1,5,translateCallback); 
+         }
+        else{
+        	var line = new BMap.Polyline(lat_lon_change,{strokeStyle:"solid",strokeWeight:4,strokeColor:"#f00",strokeOpacity:0.6});
+            map.addOverlay(line);
+            window.line = line;
+            is_show_line=true;
+            get_distance(lat_lon_change);
+            get_speed(time_difference,arr_distance);
+            check_stop();
+        	for(var i=0;i<lat_lon_change.length;i++){
+        		addMarker(lat_lon_change[i],i);
+        	}
+        	alert("共取到轨迹点："+lat_lon_change.length+"个");
+        }
+      }
+    }
+    
+    translateCallback_last=function(data){
+    	//alert(data.status)
+    	if(data.status==0){
+    		var marker = new BMap.Marker(data.points[0]);
+    		map.addOverlay(marker);
+    		marker.setAnimation(BMAP_ANIMATION_BOUNCE); //跳动的动画	
+    		marker.setTop();
+    	    window.marker_of_last =marker; 
+    	    is_show_lastpoint = true;
+    		(function(){
+				var _iw = createInfoWindow_last();
+				var _marker = marker;
+				_marker.addEventListener("click",function(){
+				    _marker.openInfoWindow(_iw);
+			    });
+			   })()
+    	}
+    }
+    
+    function createInfoWindow_last(){
+        var iw = new BMap.InfoWindow("<b class='iw_poi_title' title='time'>更新时间：" + last_time + "</b><div class='iw_poi_content'>纬度："+last_lat+"</br>"+"经度:"+last_lon+"</br>"+"海拔:"+last_alt+"</div>");
+        return iw;
+    }
+    
+    function addMarker_last(){
+    	var p = new BMap.Point(last_lon,last_lat);
+    	var arr_temp = new Array(1);
+    	arr_temp[0]=p;
+   	    convertor.translate(arr_temp,1,5,translateCallback_last);
+    }
+    
+    function addMarker(point,i){
+    		var icon = {w:22,h:22,l:0,t:0,x:6,lb:5};    	
+			var iconImg = createIcon(icon);
+            var marker = new BMap.Marker(point,{icon:iconImg});
+			var iw = createInfoWindow(i);
+			var rand = Math.random()*100;
+			marker_of_point.push(marker);
+			if(rand>50)
+				var label = new BMap.Label(i+1,{"offset":new BMap.Size(icon.lb-icon.x+Math.random()*20,-Math.random()*20)});
+			else
+				var label = new BMap.Label(i+1,{"offset":new BMap.Size(-icon.lb-icon.x+Math.random()*20,Math.random()*20)});
+			marker.setLabel(label);
+            map.addOverlay(marker);
+            label.setStyle({
+                        borderColor:"#808080",
+                        color:"#333",
+                        cursor:"pointer"
+            });
+			(function(){
+				var index = i;
+				var _iw = createInfoWindow(i);
+				var _marker = marker;
+				_marker.addEventListener("click",function(){
+				    this.openInfoWindow(_iw);
+			    });
+			    _iw.addEventListener("open",function(){
+				    _marker.getLabel().hide();
+			    })
+			    _iw.addEventListener("close",function(){
+				    _marker.getLabel().show();
+			    })
+				label.addEventListener("click",function(){
+				    _marker.openInfoWindow(_iw);
+			    })
+				if(!!point.isOpen){
+					label.hide();
+					_marker.openInfoWindow(_iw);
+				}
+			})()
+        }
+    
+  
+    function createInfoWindow(i){
+    	var count = i+1;
+        var iw = new BMap.InfoWindow("<b class='iw_poi_title' title='count'>" + arr_time[i] + "</b><div class='iw_poi_content'>海拔："+arr_alt[i]+"</br>"+"计数:"+count+"</br>" + "差:" +arr_distance[i]+ "</br>"+ "time_different:" +time_difference[i]+ "</br>" + "speed:" +arr_speed[i] + "</div>");
+        return iw;
+    }
+     function createIcon(json){
+        var icon = new BMap.Icon("http://app.baidu.com/map/images/us_mk_icon.png", new BMap.Size(json.w,json.h),{anchor:new BMap.Size(7,22),imageOffset: new BMap.Size(-json.l,-json.t),infoWindowOffset:new BMap.Size(json.lb+5,1),offset:new BMap.Size(json.x,json.h)})
+        return icon;
+    }
+    
+    //创建地图函数：
+    function createMap(){
+        var map = new BMap.Map("dituContent");//在百度地图容器中创建一个地图
+        var point = new BMap.Point(last_lon+0.011,last_lat+0.0045);//定义一个中心点坐标
+        map.centerAndZoom(point,18);//设定地图的中心点和坐标并将地图显示在地图容器中
+        window.map = map;//将map变量存储在全局
+    }
+    
+    //地图事件设置函数：
+    function setMapEvent(){
+        map.enableDragging();//启用地图拖拽事件，默认启用(可不写)
+        map.enableScrollWheelZoom();//启用地图滚轮放大缩小
+        map.enableDoubleClickZoom();//启用鼠标双击放大，默认启用(可不写)
+        map.enableKeyboard();//启用键盘上下左右键移动地图
+    }
+    
+    //地图控件添加函数：
+    function addMapControl(){
+        //向地图中添加缩放控件
+	var ctrl_nav = new BMap.NavigationControl({anchor:BMAP_ANCHOR_TOP_LEFT,type:BMAP_NAVIGATION_CONTROL_LARGE});
+	map.addControl(ctrl_nav);
+        //向地图中添加缩略图控件
+	var ctrl_ove = new BMap.OverviewMapControl({anchor:BMAP_ANCHOR_BOTTOM_RIGHT,isOpen:1});
+	map.addControl(ctrl_ove);
+        //向地图中添加比例尺控件
+	var ctrl_sca = new BMap.ScaleControl({anchor:BMAP_ANCHOR_BOTTOM_LEFT});
+	map.addControl(ctrl_sca);
+    }
+    
+    //标注线数组
+    //向地图中添加线函数
+    function addPolyline(arr_l_data){
+    if (arr_l_data.length < 1) {  
+        alert("blank");  
+    }          
+        points = [];
+        for(var i = 0;i<arr_l_data.length;i++){
+            var p0 = arr_l_data[i].split("|")[0];
+            var p1 = arr_l_data[i].split("|")[1];
+            points.push(new BMap.Point(p0,p1));      
+        }
+        var line = new BMap.Polyline(points,{strokeStyle:"solid",strokeWeight:4,strokeColor:"#f00",strokeOpacity:0.6});
+        map.addOverlay(line);
+        line.show();
+    }
+    
+    function change_lat_lon(arr){
+			arr_length = arr.length;
+            var stat = 1;
+            var start=0;
+            var end = start + 9 ; 
+            count_data=0;
+            count =0 ;
+            arr_line = [];
+            lat_lon_change=[];
+            if (is_reverse==false) {
+            arr.reverse();	
+            is_reverse=true;
+            }
+            marker_of_point=[];
+        while(stat){
+       	 points=[];
+	    	for(var i = start;i<=end;i++){
+	            var p0 = arr[i].split("|")[0];
+	            var p1 = arr[i].split("|")[1];
+	            points.push(new BMap.Point(p0,p1)); 
+	        }
+	    	arr_line.push(points);
+	    		//alert(translateCallback);
+	    		if(end == arr_length-1)stat=0;
+	    		start+=9;
+	    		end=start+9;
+	    		if(end>=arr_length){
+	    			end = arr_length-1;
+	    		}
+       	}
+        i_arr_line=0;
+       	convertor.translate(arr_line[i_arr_line],1,5,translateCallback); 
+    }
+
+    initMap();//创建和初始化地图
+</script>
+</html>

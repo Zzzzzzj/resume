@@ -1,0 +1,64 @@
+#dituContent{
+	float: left;
+}
+
+#content{
+	height: 100%;
+}
+
+#button_show_hidden{
+	padding-top: 20px;
+	padding-bottom: 5px;
+}
+
+html{
+	height: 100%;
+	margin: 0px;
+}
+
+body{
+	height: 100%;
+	margin: 0px;
+}
+
+#content_right{
+	float: right;
+}
+
+h4{
+	padding: 20px;
+	padding-top: 0px;
+	padding-bottom: 0px;
+	margin-top: 0px;
+	margin-bottom: 0px;
+}
+
+#outof_ef{
+	height: 100px;
+	overflow-y: scroll;
+	border:solid #000000 1px ;
+}
+
+#warming{
+	background-color: red;
+}
+
+#overspeed{
+	width: 40px;
+}
+
+#overspeed_show{
+		height: 80px;
+	overflow-y: scroll;
+	border:solid #000000 1px ;
+}
+
+#point_of_stop{
+	height: 90px;
+	overflow-y: scroll;
+	border:solid #000000 1px ;
+}
+
+#prompt{
+	background-color:yellow;
+}
